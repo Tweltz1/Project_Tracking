@@ -557,44 +557,44 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
     }, [part, newStatus, currentUserId, isAuthenticated, accounts, instance]);
 
     const printQrCode = useCallback(() => {
-        const printWindow = window.open('', '_blank');
-        if (printWindow) {
-            printWindow.document.write(`
-                <html>
-                <head>
-                    <title>Print QR Code</title>
-                    <style>
-                        body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-                        canvas { border: 1px solid #ccc; margin-bottom: 10px; }
-                        p { font-size: 1.2em; font-weight: bold; }
-                    </style>
-                </head>
-                <body>
-                    <canvas id="printQrCanvas"></canvas>
-                    <p>Serial Number: ${part.serialNumber}</p>
-                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
-                    <script>
-                        window.onload = function() {
-                            const canvas = document.getElementById('printQrCanvas');
-                            const baseUrl = '${window.location.origin}';
-                            const partDetailsUrl = \`${baseUrl}/part/${part.id}\`;
-                            new QRious({
-                                element: canvas,
-                                value: partDetailsUrl,
-                                size: 250,
-                                level: 'H'
-                            });
-                            window.print();
-                        };
-                    </script>
-                </body>
-                </html>
-            `);
-            printWindow.document.close();
-        } else {
-            setAlert({ message: "Could not open print window. Please allow pop-ups.", type: "error" });
-        }
-    }, [part]);
+        const printWindow = window.open('', '_blank');
+        if (printWindow) {
+            printWindow.document.write(`
+                <html>
+                <head>
+                    <title>Print QR Code</title>
+                    <style>
+                        body { font-family: 'Inter', sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                        canvas { border: 1px solid #ccc; margin-bottom: 10px; }
+                        p { font-size: 1.2em; font-weight: bold; }
+                    </style>
+                </head>
+                <body>
+                    <canvas id="printQrCanvas"></canvas>
+                    <p>Serial Number: ${part.serialNumber}</p>
+                    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js"></script>
+                    <script>
+                        window.onload = function() {
+                            const canvas = document.getElementById('printQrCanvas');
+                            const baseUrl = '${window.location.origin}'; // This is line 580
+                            const partDetailsUrl = \`\${baseUrl}/part/${part.id}\`;
+                            new QRious({
+                                element: canvas,
+                                value: partDetailsUrl,
+                                size: 250,
+                                level: 'H'
+                            });
+                            window.print();
+                        };
+                    </script>
+                </body>
+                </html>
+            `);
+            printWindow.document.close();
+        } else {
+            setAlert({ message: "Could not open print window. Please allow pop-ups.", type: "error" });
+        }
+    }, [part]);
 
     if (!part) {
         return (
