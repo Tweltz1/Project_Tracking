@@ -679,20 +679,20 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
                 <h3 className="text-xl font-semibold mb-4 text-gray-800">Update Status</h3>
                 <div className="flex flex-col sm:flex-row gap-4 items-center">
                     <select
-                        value={newStatus}
-                        onChange={(e) => setNewStatus(e.target.value)}
-                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200"
-                    >
-                        {statusOptions.map(option => (
-                            <option key={option} value={option}>{option}</option>
-                        ))}
-                    </select>
+						value={newStatus}
+						onChange={(e) => setNewStatus(e.target.value)}
+						className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200"
+					>
+						{statusOptions.map(option => (
+							<option key={option} value={option}>{option}</option>
+						))}
+					</select>
                     <button
-                        onClick={handleStatusUpdate} {/* CORRECTED: Changed to handleStatusUpdate */}
-                        className="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition duration-200 shadow-md whitespace-nowrap"
-                    >
-                        Update Status
-                    </button>
+						onClick={handleStatusUpdate} // <--- Ensure this is correct
+						className="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition duration-200 shadow-md whitespace-nowrap"
+					>
+						Update Status
+					</button>
                 </div>
             </div>
 
