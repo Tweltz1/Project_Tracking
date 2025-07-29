@@ -729,7 +729,6 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
     );
 };
 
-// --- AddPartForm Component ---
 const AddPartForm = ({ onPartAdded, onBack, currentUserId }) => {
     const [partData, setPartData] = useState({
         id: '',
@@ -745,7 +744,8 @@ const AddPartForm = ({ onPartAdded, onBack, currentUserId }) => {
     });
     const [alert, setAlert] = useState({ message: '', type: '' });
 
-    const { instance, accounts, inProgress } = useMsal();
+    // CORRECTED LINE: Removed 'inProgress' as it's not directly used in this component
+    const { instance, accounts } = useMsal(); 
     const isAuthenticated = useIsAuthenticated();
 
     const handleChange = (e) => {
