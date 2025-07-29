@@ -216,7 +216,8 @@ const Dashboard = ({ onViewDetails, onAddPart, currentUserId }) => {
             const data = await response.json();
             setParts(data);
             setAlert({ message: 'Parts loaded successfully!', type: 'success' });
-        } catch (error) {
+        }
+        catch (error) {
             console.error('Failed to fetch parts:', error);
             setAlert({ message: `Failed to load parts: ${error.message}`, type: 'error' });
         }
@@ -319,7 +320,7 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
     const { instance, accounts, inProgress } = useMsal();
     const isAuthenticated = useIsAuthenticated();
 
-    const statusOptions = ['Received', 'In Work', 'Completed', 'Sent Out']; // Defined here for scope
+    const statusOptions = ['Received', 'In Work', 'Completed', 'Sent Out'];
 
     const loadQrScriptAndDraw = useCallback(() => {
         const drawQrCode = () => {
@@ -356,7 +357,7 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             setAlert({ message: "Failed to load QR code generator.", type: "error" });
         };
         document.body.appendChild(script);
-    }, [part]); // Dependency on 'part'
+    }, [part]);
 
     const fetchPart = useCallback(async () => {
         setAlert({ message: '', type: '' });
@@ -396,7 +397,7 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             }
             const foundPart = await response.json();
             setPart(foundPart);
-            setNewStatus(foundPart.status || 'Received'); // Set newStatus when part is fetched
+            setNewStatus(foundPart.status || 'Received');
             setAlert({ message: 'Part details loaded.', type: 'success' });
 
         } catch (error) {
@@ -410,11 +411,10 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
         if (!inProgress && isAuthenticated) {
             fetchPart();
         }
-        // Load QRious script and draw when part data is ready and QRious is needed
         if (part && qrReady) {
             loadQrScriptAndDraw();
         }
-    }, [partId, part, qrReady, fetchPart, inProgress, isAuthenticated, loadQrScriptAndDraw]); // Added loadQrScriptAndDraw
+    }, [partId, part, qrReady, fetchPart, inProgress, isAuthenticated, loadQrScriptAndDraw]);
 
     const handleQuantityUpdate = useCallback(async () => {
         setAlert({ message: '', type: '' });
@@ -428,7 +428,7 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
         let newCalculatedQuantity = part.quantity;
         if (changeType === 'check-in') {
             newCalculatedQuantity += changeVal;
-        } else { // check-out
+        } else {
             if (part.quantity < changeVal) {
                 setAlert({ message: 'Cannot check out more parts than available.', type: 'error' });
                 return;
@@ -577,7 +577,7 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
                         window.onload = function() {
                             const canvas = document.getElementById('printQrCanvas');
                             const baseUrl = '${window.location.origin}';
-                            const partDetailsUrl = \`\${baseUrl}/part/${part.id}\`;
+                            const partDetailsUrl = \`${baseUrl}/part/${part.id}\`;
                             new QRious({
                                 element: canvas,
                                 value: partDetailsUrl,
@@ -595,6 +595,14 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             setAlert({ message: "Could not open print window. Please allow pop-ups.", type: "error" });
         }
     }, [part]);
+
+    if (!part) {
+        return (
+            <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                <div className="text-xl font-semibold text-gray-700">Loading part details...</div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 bg-white rounded-xl shadow-lg border border-gray-200">
@@ -666,6 +674,28 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
                 </div>
             </div>
 
+            {/* Status Update Section */}
+            <div className="mb-8 p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner">
+                <h3 className="text-xl font-semibold mb-4 text-gray-800">Update Status</h3>
+                <div className="flex flex-col sm:flex-row gap-4 items-center">
+                    <select
+                        value={newStatus}
+                        onChange={(e) => setNewStatus(e.target.value)}
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 transition duration-200"
+                    >
+                        {statusOptions.map(option => (
+                            <option key={option} value={option}>{option}</option>
+                        ))}
+                    </select>
+                    <button
+                        onClick={handleStatusUpdate} {/* CORRECTED: Changed to handleStatusUpdate */}
+                        className="bg-purple-600 text-white px-5 py-2 rounded-lg hover:bg-purple-700 transition duration-200 shadow-md whitespace-nowrap"
+                    >
+                        Update Status
+                    </button>
+                </div>
+            </div>
+
             <div className="p-6 bg-gray-50 rounded-lg border border-gray-200 shadow-inner">
                 <h3 className="text-xl font-semibold mb-4 text-gray-800">Transaction History</h3>
                 {part.history && part.history.length > 0 ? (
@@ -715,15 +745,15 @@ const AddPartForm = ({ onPartAdded, onBack, currentUserId }) => {
     });
     const [alert, setAlert] = useState({ message: '', type: '' });
 
-    const { instance, accounts, inProgress } = useMsal(); // Destructure useMsal here
-    const isAuthenticated = useIsAuthenticated(); // Destructure useIsAuthenticated here
+    const { instance, accounts, inProgress } = useMsal();
+    const isAuthenticated = useIsAuthenticated();
 
     const handleChange = (e) => {
         const { name, value } = e.target;
         setPartData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = useCallback(async (e) => { // Wrapped in useCallback
+    const handleSubmit = useCallback(async (e) => {
         e.preventDefault();
         setAlert({ message: '', type: '' });
 
@@ -870,6 +900,8 @@ const ProjectTrackingAppContent = () => {
     const [currentPage, setCurrentPage] = useState('dashboard');
     const [selectedPartId, setSelectedPartId] = useState(null);
 
+    // inProgress is handled within AuthContentWrapper to set loadingAuth,
+    // so no direct change needed here for the ESLint warning related to inProgress.
     if (loadingAuth) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100">
@@ -947,4 +979,3 @@ const App = () => {
 };
 
 export default App;
- 
