@@ -6,13 +6,12 @@ import { MsalProvider, useMsal, useIsAuthenticated } from "@azure/msal-react";
 const AuthContext = createContext(null);
 
 // --- MSAL Configuration ---
-// IMPORTANT: These values are now filled with your specific Azure AD B2C details
 const msalConfig = {
     auth: {
-        clientId: '5aa716c1-5e3e-4227-b897-061de2e2b482',
-        authority: 'https://compprojecttracking.b2clogin.com/compprojecttracking.onmicrosoft.com/B2C_1_signup_signin',
-        redirectUri: 'https://polite-ocean-05506b310.1.azurestaticapps.net/',
-        knownAuthorities: ['compprojecttracking.b2clogin.com']
+        clientId: '5aa716c1-5e3e-4227-b897-061de2e2b482', // Your Application (client) ID
+        authority: 'https://compprojecttracking.b2clogin.com/compprojecttracking.onmicrosoft.com/B2C_1_signup_signin', // Your B2C Tenant Name and User Flow Name
+        redirectUri: 'https://polite-ocean-05506b310.1.azurestaticapps.net/', // Your Azure Static Web App URL
+        knownAuthorities: ['compprojecttracking.b2clogin.com'] // Just the tenant login domain
     },
     cache: {
         cacheLocation: "sessionStorage",
@@ -244,7 +243,7 @@ const Dashboard = ({ onViewDetails, onAddPart, currentUserId }) => {
             <div className="mb-6 flex flex-col sm:flex-row gap-4 items-center justify-between">
                 <input
                     type="text"
-                    placeholder="Search by Name, SN, Project Name/No., Status..."
+                    placeholder="Search by Name, SN, Project Name/No."
                     className="flex-grow px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
@@ -311,43 +310,26 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
     const [part, setPart] = useState(null);
     const [quantityChange, setQuantityChange] = useState('');
     const [changeType, setChangeType] = useState('check-in');
+    const [newStatus, setNewStatus] = useState('');
     const [alert, setAlert] = useState({ message: '', type: '' });
     const qrCanvasRef = useRef(null);
     const scriptLoaded = useRef(false);
     const [qrReady, setQrReady] = useState(false);
-    const { instance, accounts, inProgress } = useMsal(); // Add instance, accounts, inProgress
-    const isAuthenticated = useIsAuthenticated(); // Add isAuthenticated
 
-    useEffect(() => {
-        const loadScript = () => {
-            if (scriptLoaded.current) {
-                setQrReady(true);
-                return;
-            }
-            const script = document.createElement('script');
-            script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js";
-            script.onload = () => {
-                scriptLoaded.current = true;
-                setQrReady(true);
-                drawQrCode();
-            };
-            script.onerror = () => {
-                console.error("Failed to load QRious script.");
-                setAlert({ message: "Failed to load QR code generator.", type: "error" });
-            };
-            document.body.appendChild(script);
-        };
+    const { instance, accounts, inProgress } = useMsal();
+    const isAuthenticated = useIsAuthenticated();
 
+    const statusOptions = ['Received', 'In Work', 'Completed', 'Sent Out']; // Defined here for scope
+
+    const loadQrScriptAndDraw = useCallback(() => {
         const drawQrCode = () => {
             if (qrCanvasRef.current && window.QRious && part) {
                 const baseUrl = window.location.origin;
                 const partDetailsUrl = `${baseUrl}/part/${part.id}`;
-
                 const context = qrCanvasRef.current.getContext('2d');
                 if (context) {
                     context.clearRect(0, 0, qrCanvasRef.current.width, qrCanvasRef.current.height);
                 }
-
                 new window.QRious({
                     element: qrCanvasRef.current,
                     value: partDetailsUrl,
@@ -357,66 +339,84 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             }
         };
 
-        const fetchPart = useCallback(async () => {
-            setAlert({ message: '', type: '' });
-            try {
-                let accessToken = null;
-                if (isAuthenticated && accounts.length > 0) {
-                    try {
-                        const request = {
-                            scopes: ["openid", "profile", msalConfig.auth.clientId],
-                            account: accounts[0]
-                        };
-                        const response = await instance.acquireTokenSilent(request);
-                        accessToken = response.accessToken;
-                    } catch (error) {
-                        console.warn("Silent token acquisition failed. Trying interactive (popup/redirect).", error);
-                        const response = await instance.acquireTokenPopup({
-                            scopes: ["openid", "profile", msalConfig.auth.clientId],
-                            account: accounts[0]
-                        });
-                        accessToken = response.accessToken;
-                    }
-                }
-
-                if (!accessToken) {
-                    setAlert({ message: "Authentication token missing. Please log in again.", type: "error" });
-                    return;
-                }
-
-                const response = await fetch(`/api/GetPartById?id=${partId}`, {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`,
-                        'Content-Type': 'application/json'
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-                const foundPart = await response.json();
-                setPart(foundPart);
-                setAlert({ message: 'Part details loaded.', type: 'success' });
-
-            } catch (error) {
-                console.error('Failed to fetch part details:', error);
-                setAlert({ message: `Failed to load part details: ${error.message}`, type: 'error' });
-                setPart(null);
-            }
-        }, [partId, isAuthenticated, accounts, instance]); // Dependencies for useCallback
-
-        fetchPart();
-        loadScript();
-
-        if (qrReady && part) {
+        if (scriptLoaded.current) {
+            setQrReady(true);
             drawQrCode();
+            return;
         }
-
-        return () => {
-            // No direct removal needed for QRious as it's typically loaded once globally
+        const script = document.createElement('script');
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/qrious/4.0.2/qrious.min.js";
+        script.onload = () => {
+            scriptLoaded.current = true;
+            setQrReady(true);
+            drawQrCode();
         };
-    }, [partId, part, qrReady, fetchPart]); // Added fetchPart to dependency array
+        script.onerror = () => {
+            console.error("Failed to load QRious script.");
+            setAlert({ message: "Failed to load QR code generator.", type: "error" });
+        };
+        document.body.appendChild(script);
+    }, [part]); // Dependency on 'part'
 
-    const handleQuantityUpdate = async () => {
+    const fetchPart = useCallback(async () => {
+        setAlert({ message: '', type: '' });
+        try {
+            let accessToken = null;
+            if (isAuthenticated && accounts.length > 0) {
+                try {
+                    const request = {
+                        scopes: ["openid", "profile", msalConfig.auth.clientId],
+                        account: accounts[0]
+                    };
+                    const response = await instance.acquireTokenSilent(request);
+                    accessToken = response.accessToken;
+                } catch (error) {
+                    console.warn("Silent token acquisition failed. Trying interactive (popup/redirect).", error);
+                    const response = await instance.acquireTokenPopup({
+                        scopes: ["openid", "profile", msalConfig.auth.clientId],
+                        account: accounts[0]
+                    });
+                    accessToken = response.accessToken;
+                }
+            }
+
+            if (!accessToken) {
+                setAlert({ message: "Authentication token missing. Please log in again.", type: "error" });
+                return;
+            }
+
+            const response = await fetch(`/api/GetPartById?id=${partId}`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const foundPart = await response.json();
+            setPart(foundPart);
+            setNewStatus(foundPart.status || 'Received'); // Set newStatus when part is fetched
+            setAlert({ message: 'Part details loaded.', type: 'success' });
+
+        } catch (error) {
+            console.error('Failed to fetch part details:', error);
+            setAlert({ message: `Failed to load part details: ${error.message}`, type: 'error' });
+            setPart(null);
+        }
+    }, [partId, isAuthenticated, accounts, instance]);
+
+    useEffect(() => {
+        if (!inProgress && isAuthenticated) {
+            fetchPart();
+        }
+        // Load QRious script and draw when part data is ready and QRious is needed
+        if (part && qrReady) {
+            loadQrScriptAndDraw();
+        }
+    }, [partId, part, qrReady, fetchPart, inProgress, isAuthenticated, loadQrScriptAndDraw]); // Added loadQrScriptAndDraw
+
+    const handleQuantityUpdate = useCallback(async () => {
         setAlert({ message: '', type: '' });
         const changeVal = parseInt(quantityChange, 10);
 
@@ -488,9 +488,9 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             console.error('Failed to update quantity:', error);
             setAlert({ message: `Failed to update quantity: ${error.message}`, type: 'error' });
         }
-    };
+    }, [quantityChange, changeType, part, currentUserId, isAuthenticated, accounts, instance]);
 
-    const handleStatusUpdate = async () => {
+    const handleStatusUpdate = useCallback(async () => {
         setAlert({ message: '', type: '' });
         if (!part || !newStatus || newStatus === part.status) {
             setAlert({ message: "Please select a new status to update.", type: "error" });
@@ -554,21 +554,9 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             console.error("Error updating status:", error);
             setAlert({ message: "Error updating status. Please try again.", type: "error" });
         }
-    };
+    }, [part, newStatus, currentUserId, isAuthenticated, accounts, instance]);
 
-    if (!part) {
-        return (
-            <div className="p-4 bg-white rounded-xl shadow-lg border border-gray-200">
-                <button onClick={onBack} className="mb-4 px-4 py-2 bg-gray-300 text-gray-800 rounded-lg hover:bg-gray-400 transition duration-200 shadow-md">
-                    Back to Dashboard
-                </button>
-                <div className="text-center text-gray-500">Loading part details or part not found...</div>
-                {alert.message && <MessageModal alert={alert} onClose={() => setAlert({ message: '', type: '' })} />}
-            </div>
-        );
-    }
-
-    const printQrCode = () => {
+    const printQrCode = useCallback(() => {
         const printWindow = window.open('', '_blank');
         if (printWindow) {
             printWindow.document.write(`
@@ -606,8 +594,7 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
         } else {
             setAlert({ message: "Could not open print window. Please allow pop-ups.", type: "error" });
         }
-    };
-
+    }, [part]);
 
     return (
         <div className="p-4 bg-white rounded-xl shadow-lg border border-gray-200">
@@ -728,12 +715,15 @@ const AddPartForm = ({ onPartAdded, onBack, currentUserId }) => {
     });
     const [alert, setAlert] = useState({ message: '', type: '' });
 
+    const { instance, accounts, inProgress } = useMsal(); // Destructure useMsal here
+    const isAuthenticated = useIsAuthenticated(); // Destructure useIsAuthenticated here
+
     const handleChange = (e) => {
         const { name, value } = e.target;
         setPartData(prev => ({ ...prev, [name]: value }));
     };
 
-    const handleSubmit = async (e) => {
+    const handleSubmit = useCallback(async (e) => { // Wrapped in useCallback
         e.preventDefault();
         setAlert({ message: '', type: '' });
 
@@ -796,7 +786,7 @@ const AddPartForm = ({ onPartAdded, onBack, currentUserId }) => {
             console.error('Failed to add part:', error);
             setAlert({ message: `Failed to add part: ${error.message}`, type: 'error' });
         }
-    };
+    }, [partData, currentUserId, isAuthenticated, accounts, instance, onPartAdded]);
 
     return (
         <div className="p-4 bg-white rounded-xl shadow-lg border border-gray-200">
@@ -880,7 +870,6 @@ const ProjectTrackingAppContent = () => {
     const [currentPage, setCurrentPage] = useState('dashboard');
     const [selectedPartId, setSelectedPartId] = useState(null);
 
-    // If MSAL is in progress (e.g., redirecting), show a loading state
     if (loadingAuth) {
         return (
             <div className="flex items-center justify-center min-h-screen bg-gray-100">
