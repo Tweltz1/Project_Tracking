@@ -1,4 +1,4 @@
-import React, { useState, useEffect, createContext, useContext, useRef } from 'react';
+import React, { useState, useEffect, createContext, useContext, useRef, useCallback } from 'react';
 import { PublicClientApplication, EventType } from "@azure/msal-browser";
 import { MsalProvider, useMsal, useIsAuthenticated } from "@azure/msal-react";
 
@@ -6,12 +6,13 @@ import { MsalProvider, useMsal, useIsAuthenticated } from "@azure/msal-react";
 const AuthContext = createContext(null);
 
 // --- MSAL Configuration ---
+// IMPORTANT: These values are now filled with your specific Azure AD B2C details
 const msalConfig = {
     auth: {
-        clientId: 'YOUR_B2C_WEB_APP_APPLICATION_CLIENT_ID', // <--- REPLACE THIS (from Phase 1, Step 2)
-        authority: 'https://<your-b2c-tenant-name>.b2clogin.com/<your-b2c-tenant-name>.onmicrosoft.com/B2C_1_signup_signin', // <--- REPLACE THIS: Tenant name and user flow name
-        redirectUri: 'https://nice-water-078be8810.2.azurestaticapps.net', // Your Azure Static Web App URL
-        knownAuthorities: ['<your-b2c-tenant-name>.b2clogin.com'] // <--- REPLACE THIS: Just the tenant login domain
+        clientId: '5aa716c1-5e3e-4227-b897-061de2e2b482',
+        authority: 'https://compprojecttracking.b2clogin.com/compprojecttracking.onmicrosoft.com/B2C_1_signup_signin',
+        redirectUri: 'https://polite-ocean-05506b310.1.azurestaticapps.net/',
+        knownAuthorities: ['compprojecttracking.b2clogin.com']
     },
     cache: {
         cacheLocation: "sessionStorage",
@@ -23,12 +24,10 @@ const msalInstance = new PublicClientApplication(msalConfig);
 
 // --- AuthProvider (MSAL Wrapper) ---
 const AuthProviderWithMsal = ({ children }) => {
-    // Add event callback to handle redirect after login/logout
     useEffect(() => {
         const handleRedirect = (event) => {
             if (event.eventType === EventType.LOGIN_SUCCESS && event.payload.account) {
                 console.log("MSAL Login Success from redirect:", event.payload.account);
-                // No need to set anything here directly, useMsal hook will update
             } else if (event.eventType === EventType.LOGOUT_SUCCESS) {
                 console.log("MSAL Logout Success");
             }
@@ -54,34 +53,30 @@ const AuthProviderWithMsal = ({ children }) => {
 
 // --- AuthContentWrapper ---
 const AuthContentWrapper = ({ children }) => {
-    const { instance, accounts, inProgress } = useMsal(); // Added inProgress
+    const { instance, accounts, inProgress } = useMsal();
     const isAuthenticated = useIsAuthenticated();
     const [currentUser, setCurrentUser] = useState(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
     const [userId, setUserId] = useState(null);
 
     useEffect(() => {
-        // MSAL handles redirect callbacks automatically
-        // This effect processes the authentication state after MSAL is done
-        if (!inProgress) { // Only update state when MSAL is not actively processing auth
+        if (!inProgress) {
             if (isAuthenticated && accounts.length > 0) {
                 const account = accounts[0];
                 setCurrentUser({ email: account.username });
-                setUserId(account.homeAccountId || account.localAccountId); // Use a reliable ID from MSAL
+                setUserId(account.homeAccountId || account.localAccountId);
             } else {
                 setCurrentUser(null);
                 setUserId(null);
             }
             setLoadingAuth(false);
         } else {
-            // If MSAL is in progress (e.g., redirecting), keep loading state true
             setLoadingAuth(true);
         }
-    }, [isAuthenticated, accounts, inProgress]); // Depend on inProgress to know when MSAL is done
+    }, [isAuthenticated, accounts, inProgress]);
 
     const login = async () => {
         try {
-            // Use loginRedirect for full page redirect to B2C
             await instance.loginRedirect();
         } catch (error) {
             console.error("MSAL Login failed:", error);
@@ -89,11 +84,9 @@ const AuthContentWrapper = ({ children }) => {
     };
 
     const logout = () => {
-        // Use logoutRedirect for full page redirect for logout
         instance.logoutRedirect();
     };
 
-    // Provide the real auth state and functions to the rest of the app
     return (
         <AuthContext.Provider value={{ currentUser, loadingAuth, userId, simulateLogin: login, simulateLogout: logout }}>
             {children}
@@ -127,8 +120,6 @@ const MessageModal = ({ alert, onClose }) => {
 const LoginPage = () => {
     const { simulateLogin } = useContext(AuthContext);
 
-    // The login and signup buttons will now directly trigger the MSAL redirect.
-    // The email/password inputs are visually present but disabled, as B2C handles them.
     return (
         <div className="flex items-center justify-center min-h-screen bg-gray-100 p-4">
             <div className="bg-white p-8 rounded-xl shadow-lg w-full max-w-md border border-gray-200">
@@ -141,7 +132,7 @@ const LoginPage = () => {
                             id="email"
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
                             placeholder="your.email@example.com"
-                            disabled // Disabled as B2C handles input
+                            disabled
                         />
                     </div>
                     <div>
@@ -151,20 +142,20 @@ const LoginPage = () => {
                             id="password"
                             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 transition duration-200"
                             placeholder="••••••••"
-                            disabled // Disabled as B2C handles input
+                            disabled
                         />
                     </div>
                     <div className="flex flex-col sm:flex-row gap-4">
                         <button
-                            type="button" // Change to type="button" to prevent form submission default
-                            onClick={simulateLogin} // Directly trigger MSAL login
+                            type="button"
+                            onClick={simulateLogin}
                             className="flex-1 px-6 py-3 bg-blue-600 text-white font-bold rounded-lg hover:bg-blue-700 transition duration-200 shadow-md text-lg"
                         >
                             Login
                         </button>
                         <button
-                            type="button" // Change to type="button"
-                            onClick={simulateLogin} // Directly trigger MSAL login (B2C handles signup through user flow)
+                            type="button"
+                            onClick={simulateLogin}
                             className="flex-1 px-6 py-3 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition duration-200 shadow-md text-lg"
                         >
                             Sign Up
@@ -184,44 +175,28 @@ const Dashboard = ({ onViewDetails, onAddPart, currentUserId }) => {
     const [parts, setParts] = useState([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [alert, setAlert] = useState({ message: '', type: '' });
-    const { instance, accounts, inProgress } = useMsal(); // Include inProgress
-    const isAuthenticated = useIsAuthenticated(); // Check if user is authenticated
+    const { instance, accounts, inProgress } = useMsal();
+    const isAuthenticated = useIsAuthenticated();
 
-    useEffect(() => {
-        // Only try to fetch parts if not in an MSAL redirect flow and authenticated
-        if (!inProgress && isAuthenticated) {
-            fetchParts();
-        }
-    }, [isAuthenticated, inProgress]); // Depend on isAuthenticated and inProgress
-
-    const fetchParts = async () => {
+    const fetchParts = useCallback(async () => {
         setAlert({ message: '', type: '' });
         try {
             let accessToken = null;
-            if (accounts.length > 0) {
+            if (isAuthenticated && accounts.length > 0) {
                 try {
-                    // This scope should match an exposed API permission in your B2C app registration (if calling protected APIs)
-                    // For now, using client ID as a placeholder scope to get a token
                     const request = {
-                        scopes: ["openid", "profile", msalConfig.auth.clientId], // Default scopes for user profile + app client ID
+                        scopes: ["openid", "profile", msalConfig.auth.clientId],
                         account: accounts[0]
                     };
                     const response = await instance.acquireTokenSilent(request);
                     accessToken = response.accessToken;
                 } catch (error) {
                     console.warn("Silent token acquisition failed. Trying interactive (popup/redirect).", error);
-                    try {
-                        // Fallback to interactive method (popup is easier for debugging, redirect for production)
-                        const response = await instance.acquireTokenPopup({
-                            scopes: ["openid", "profile", msalConfig.auth.clientId],
-                            account: accounts[0]
-                        });
-                        accessToken = response.accessToken;
-                    } catch (interactiveError) {
-                        console.error("Interactive token acquisition failed:", interactiveError);
-                        setAlert({ message: "Failed to acquire token. Please log in again.", type: "error" });
-                        return;
-                    }
+                    const response = await instance.acquireTokenPopup({
+                        scopes: ["openid", "profile", msalConfig.auth.clientId],
+                        account: accounts[0]
+                    });
+                    accessToken = response.accessToken;
                 }
             }
 
@@ -230,24 +205,36 @@ const Dashboard = ({ onViewDetails, onAddPart, currentUserId }) => {
                 return;
             }
 
-            // Placeholder: In a real Azure app, replace with an API call to your Azure Function
-            // Example: const response = await fetch('/api/GetParts', { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            // For now, still using local storage for data persistence
-            const storedParts = JSON.parse(localStorage.getItem('projectTrackingParts') || '[]');
-            setParts(storedParts);
+            const response = await fetch('/api/GetParts', {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const data = await response.json();
+            setParts(data);
             setAlert({ message: 'Parts loaded successfully!', type: 'success' });
         } catch (error) {
             console.error('Failed to fetch parts:', error);
             setAlert({ message: `Failed to load parts: ${error.message}`, type: 'error' });
         }
-    };
+    }, [isAuthenticated, accounts, instance]);
+
+    useEffect(() => {
+        if (!inProgress && isAuthenticated) {
+            fetchParts();
+        }
+    }, [isAuthenticated, inProgress, fetchParts]);
 
     const filteredParts = parts.filter(part =>
         part.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         part.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
         part.projectName.toLowerCase().includes(searchTerm.toLowerCase()) ||
         part.projectNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        part.status.toLowerCase().includes(searchTerm.toLowerCase()) // Added status to search
+        part.status.toLowerCase().includes(searchTerm.toLowerCase())
     );
 
     return (
@@ -272,7 +259,7 @@ const Dashboard = ({ onViewDetails, onAddPart, currentUserId }) => {
 
             {alert.message && <MessageModal alert={alert} onClose={() => setAlert({ message: '', type: '' })} />}
 
-            {filteredParts.length === 0 && !alert.message ? ( // Only show if no parts and no active alert
+            {filteredParts.length === 0 && !alert.message ? (
                 <p className="text-center text-gray-500">No parts found. Add a new part!</p>
             ) : (
                 <div className="overflow-x-auto">
@@ -328,9 +315,10 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
     const qrCanvasRef = useRef(null);
     const scriptLoaded = useRef(false);
     const [qrReady, setQrReady] = useState(false);
+    const { instance, accounts, inProgress } = useMsal(); // Add instance, accounts, inProgress
+    const isAuthenticated = useIsAuthenticated(); // Add isAuthenticated
 
     useEffect(() => {
-        // Function to load the QRious script
         const loadScript = () => {
             if (scriptLoaded.current) {
                 setQrReady(true);
@@ -350,7 +338,6 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             document.body.appendChild(script);
         };
 
-        // Draw QR code function
         const drawQrCode = () => {
             if (qrCanvasRef.current && window.QRious && part) {
                 const baseUrl = window.location.origin;
@@ -370,18 +357,52 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             }
         };
 
-        // Load the part data
-        const fetchPart = async () => {
+        const fetchPart = useCallback(async () => {
             setAlert({ message: '', type: '' });
-            const storedParts = JSON.parse(localStorage.getItem('projectTrackingParts') || '[]');
-            const foundPart = storedParts.find(p => p.id === partId);
-            if (foundPart) {
+            try {
+                let accessToken = null;
+                if (isAuthenticated && accounts.length > 0) {
+                    try {
+                        const request = {
+                            scopes: ["openid", "profile", msalConfig.auth.clientId],
+                            account: accounts[0]
+                        };
+                        const response = await instance.acquireTokenSilent(request);
+                        accessToken = response.accessToken;
+                    } catch (error) {
+                        console.warn("Silent token acquisition failed. Trying interactive (popup/redirect).", error);
+                        const response = await instance.acquireTokenPopup({
+                            scopes: ["openid", "profile", msalConfig.auth.clientId],
+                            account: accounts[0]
+                        });
+                        accessToken = response.accessToken;
+                    }
+                }
+
+                if (!accessToken) {
+                    setAlert({ message: "Authentication token missing. Please log in again.", type: "error" });
+                    return;
+                }
+
+                const response = await fetch(`/api/GetPartById?id=${partId}`, {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    }
+                });
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                const foundPart = await response.json();
                 setPart(foundPart);
                 setAlert({ message: 'Part details loaded.', type: 'success' });
-            } else {
-                setAlert({ message: 'Part not found.', type: 'error' });
+
+            } catch (error) {
+                console.error('Failed to fetch part details:', error);
+                setAlert({ message: `Failed to load part details: ${error.message}`, type: 'error' });
+                setPart(null);
             }
-        };
+        }, [partId, isAuthenticated, accounts, instance]); // Dependencies for useCallback
 
         fetchPart();
         loadScript();
@@ -390,11 +411,10 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             drawQrCode();
         }
 
-        // Cleanup script tag on unmount if necessary
         return () => {
             // No direct removal needed for QRious as it's typically loaded once globally
         };
-    }, [partId, part, qrReady]);
+    }, [partId, part, qrReady, fetchPart]); // Added fetchPart to dependency array
 
     const handleQuantityUpdate = async () => {
         setAlert({ message: '', type: '' });
@@ -416,26 +436,124 @@ const PartDetails = ({ partId, onBack, currentUserId }) => {
             newCalculatedQuantity -= changeVal;
         }
 
-        const updatedPart = {
-            ...part,
-            quantity: newCalculatedQuantity,
-            history: [
-                ...(part.history || []),
-                {
-                    type: changeType,
-                    change: changeVal,
-                    timestamp: new Date().toISOString(),
-                    user: currentUserId || 'Anonymous'
-                }
-            ]
+        let accessToken = null;
+        if (isAuthenticated && accounts.length > 0) {
+            try {
+                const request = {
+                    scopes: ["openid", "profile", msalConfig.auth.clientId],
+                    account: accounts[0]
+                };
+                const response = await instance.acquireTokenSilent(request);
+                accessToken = response.accessToken;
+            } catch (error) {
+                console.warn("Silent token acquisition failed. Trying interactive.", error);
+                const response = await instance.acquireTokenPopup({
+                    scopes: ["openid", "profile", msalConfig.auth.clientId],
+                    account: accounts[0]
+                });
+                accessToken = response.accessToken;
+            }
+        }
+
+        if (!accessToken) {
+            setAlert({ message: "Authentication token missing. Please log in again.", type: "error" });
+            return;
+        }
+
+        const updatedPartDataForApi = {
+            partId: part.id,
+            newQuantity: newCalculatedQuantity,
+            type: changeType,
+            change: changeVal,
+            userId: currentUserId || 'Anonymous'
         };
 
-        const storedParts = JSON.parse(localStorage.getItem('projectTrackingParts') || '[]');
-        const updatedParts = storedParts.map(p => (p.id === part.id ? updatedPart : p));
-        localStorage.setItem('projectTrackingParts', JSON.stringify(updatedParts));
-        setPart(updatedPart); // Update local state
-        setQuantityChange('');
-        setAlert({ message: `${changeType === 'check-in' ? 'Checked in' : 'Checked out'} ${changeVal} units. New quantity: ${newCalculatedQuantity}.`, type: 'success' });
+        try {
+            const response = await fetch('/api/CheckInCheckOut', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatedPartDataForApi)
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const updatedPartFromServer = await response.json();
+            setPart(updatedPartFromServer);
+            setQuantityChange('');
+            setAlert({ message: `${changeType === 'check-in' ? 'Checked in' : 'Checked out'} ${changeVal} units. New quantity: ${newCalculatedQuantity}.`, type: 'success' });
+        } catch (error) {
+            console.error('Failed to update quantity:', error);
+            setAlert({ message: `Failed to update quantity: ${error.message}`, type: 'error' });
+        }
+    };
+
+    const handleStatusUpdate = async () => {
+        setAlert({ message: '', type: '' });
+        if (!part || !newStatus || newStatus === part.status) {
+            setAlert({ message: "Please select a new status to update.", type: "error" });
+            return;
+        }
+
+        let accessToken = null;
+        if (isAuthenticated && accounts.length > 0) {
+            try {
+                const request = {
+                    scopes: ["openid", "profile", msalConfig.auth.clientId],
+                    account: accounts[0]
+                };
+                const response = await instance.acquireTokenSilent(request);
+                accessToken = response.accessToken;
+            } catch (error) {
+                console.warn("Silent token acquisition failed. Trying interactive.", error);
+                const response = await instance.acquireTokenPopup({
+                    scopes: ["openid", "profile", msalConfig.auth.clientId],
+                    account: accounts[0]
+                });
+                accessToken = response.accessToken;
+            }
+        }
+
+        if (!accessToken) {
+            setAlert({ message: "Authentication token missing. Please log in again.", type: "error" });
+            return;
+        }
+
+        const historyEntry = {
+            type: 'status-update',
+            oldStatus: part.status,
+            newStatus: newStatus,
+            timestamp: new Date().toISOString(),
+            user: currentUserId || 'Anonymous',
+        };
+
+        const updatedPartDataForApi = {
+            ...part,
+            status: newStatus,
+            history: [...(part.history || []), historyEntry]
+        };
+
+        try {
+            const response = await fetch(`/api/UpdatePart?id=${part.id}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(updatedPartDataForApi)
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            const updatedPartFromServer = await response.json();
+            setPart(updatedPartFromServer);
+            setAlert({ message: `Part status updated to: ${newStatus}`, type: 'success' });
+        } catch (error) {
+            console.error("Error updating status:", error);
+            setAlert({ message: "Error updating status. Please try again.", type: "error" });
+        }
     };
 
     if (!part) {
@@ -624,9 +742,33 @@ const AddPartForm = ({ onPartAdded, onBack, currentUserId }) => {
             return;
         }
 
+        let accessToken = null;
+        if (isAuthenticated && accounts.length > 0) {
+            try {
+                const request = {
+                    scopes: ["openid", "profile", msalConfig.auth.clientId],
+                    account: accounts[0]
+                };
+                const response = await instance.acquireTokenSilent(request);
+                accessToken = response.accessToken;
+            } catch (error) {
+                console.warn("Silent token acquisition failed. Trying interactive.", error);
+                const response = await instance.acquireTokenPopup({
+                    scopes: ["openid", "profile", msalConfig.auth.clientId],
+                    account: accounts[0]
+                });
+                accessToken = response.accessToken;
+            }
+        }
+
+        if (!accessToken) {
+            setAlert({ message: "Authentication token missing. Please log in again.", type: "error" });
+            return;
+        }
+
         const finalPartData = {
             ...partData,
-            quantity: parseInt(partData.quantity, 10), // Ensure quantity is a number
+            quantity: parseInt(partData.quantity, 10),
             history: [{
                 type: 'initial-add',
                 change: parseInt(partData.quantity, 10),
@@ -636,16 +778,20 @@ const AddPartForm = ({ onPartAdded, onBack, currentUserId }) => {
         };
 
         try {
-            const storedParts = JSON.parse(localStorage.getItem('projectTrackingParts') || '[]');
-            // Check for duplicate ID
-            if (storedParts.some(p => p.id === finalPartData.id)) {
-                setAlert({ message: 'Part with this ID already exists. Please use a unique ID.', type: 'error' });
-                return;
+            const response = await fetch('/api/CreatePart', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(finalPartData)
+            });
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
             }
-            const updatedParts = [...storedParts, finalPartData];
-            localStorage.setItem('projectTrackingParts', JSON.stringify(updatedParts));
-            setAlert({ message: 'Part added successfully!', type: 'success' });
-            onPartAdded(); // Go back to dashboard
+            const createdPart = await response.json();
+            setAlert({ message: `Part '${createdPart.name}' added successfully!`, type: 'success' });
+            onPartAdded();
         } catch (error) {
             console.error('Failed to add part:', error);
             setAlert({ message: `Failed to add part: ${error.message}`, type: 'error' });
@@ -762,7 +908,7 @@ const ProjectTrackingAppContent = () => {
 
             <main className="flex-grow p-4">
                 {!currentUser ? (
-                    <LoginPage /> // Display LoginPage if no user is authenticated
+                    <LoginPage />
                 ) : (
                     <div className="bg-white p-6 rounded-xl shadow-lg border border-gray-200">
                         {currentPage === 'dashboard' && (
