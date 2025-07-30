@@ -39,7 +39,7 @@ jobs:
           api_location: "api/ProjectTrackingApiFunctions" # Api source code path - optional
           output_location: "build" # Built app content directory - optional
           app_build_command: "npm run build" # Explicitly tell it how to build the frontend
-          api_build_command: "npm install && npm run build" # Explicitly tell it how to build the API functions
+          api_build_command: "npm install" # Explicitly tell it how to build the API functions
           ###### End of Repository/Build Configurations ######
 
   close_pull_request_job:
