@@ -55,34 +55,49 @@ const AuthContentWrapper = ({ children }) => {
     const { instance, accounts, inProgress } = useMsal();
     const isAuthenticated = useIsAuthenticated();
     const [currentUser, setCurrentUser] = useState(null);
-    const [loadingAuth, setLoadingAuth] = useState(true);
+    const [loadingAuth, setLoadingAuth] = useState(true); // Initialized to true
     const [userId, setUserId] = useState(null);
 
+    // Add console logs here to trace the state
     useEffect(() => {
+        console.log("AuthContext useEffect triggered:");
+        console.log("  inProgress:", inProgress);
+        console.log("  isAuthenticated:", isAuthenticated);
+        console.log("  accounts:", accounts);
+
         if (!inProgress) {
+            console.log("MSAL is NOT in progress.");
             if (isAuthenticated && accounts.length > 0) {
                 const account = accounts[0];
                 setCurrentUser({ email: account.username });
                 setUserId(account.homeAccountId || account.localAccountId);
+                console.log("  User is authenticated:", account.username);
+                setLoadingAuth(false); // Should set to false if authenticated
             } else {
+                console.log("  User is NOT authenticated or no accounts found.");
                 setCurrentUser(null);
                 setUserId(null);
+                setLoadingAuth(false); // Should set to false if not authenticated (to show login page)
             }
-            setLoadingAuth(false);
         } else {
-            setLoadingAuth(true);
+            console.log("MSAL is IN PROGRESS (e.g., redirecting or processing).");
+            setLoadingAuth(true); // Keep loading if in progress
         }
-    }, [isAuthenticated, accounts, inProgress]);
+    }, [isAuthenticated, accounts, inProgress]); // Dependencies for useEffect
 
     const login = async () => {
         try {
+            console.log("Login button clicked: Attempting MSAL loginRedirect...");
             await instance.loginRedirect();
+            // This line might not be reached if redirect happens immediately
+            console.log("loginRedirect initiated (this might not log if redirect happens).");
         } catch (error) {
-            console.error("MSAL Login failed:", error);
+            console.error("MSAL Login failed:", error); // Check for this specific error in console
         }
     };
 
     const logout = () => {
+        console.log("Logout button clicked: Attempting MSAL logoutRedirect...");
         instance.logoutRedirect();
     };
 
