@@ -6,7 +6,7 @@
   "scripts": {
     "start": "func start",
     "test": "echo \"No tests yet...\""
-	"build": "tsc" // <--- ADD OR ENSURE THIS LINE EXISTS
+	"build": "tsc" 
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.0",
