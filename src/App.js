@@ -24,22 +24,38 @@ const msalInstance = new PublicClientApplication(msalConfig);
 // --- AuthProvider (MSAL Wrapper) ---
 const AuthProviderWithMsal = ({ children }) => {
     useEffect(() => {
-        const handleRedirect = (event) => {
+        console.log("AuthProviderWithMsal: Setting up MSAL event callbacks.");
+
+        const handleMsalEvent = (event) => { // Generic event handler
+            console.log("MSAL Event Fired:", event.eventType, event.payload);
             if (event.eventType === EventType.LOGIN_SUCCESS && event.payload.account) {
-                console.log("MSAL Login Success from redirect:", event.payload.account);
+                console.log("SUCCESS: MSAL LOGIN_SUCCESS event detected with account:", event.payload.account.username);
             } else if (event.eventType === EventType.LOGOUT_SUCCESS) {
-                console.log("MSAL Logout Success");
+                console.log("SUCCESS: MSAL LOGOUT_SUCCESS event detected.");
             }
         };
 
-        const callbackId = msalInstance.addEventCallback(handleRedirect);
+        const callbackId = msalInstance.addEventCallback(handleMsalEvent);
+
+        // Explicitly handle redirect promise. MsalProvider usually does this, but good for debugging.
+        msalInstance.handleRedirectPromise().then((response) => {
+            if (response) {
+                console.log("MSAL handleRedirectPromise resolved with response:", response);
+                // At this point, accounts and isAuthenticated should update
+            } else {
+                console.log("MSAL handleRedirectPromise resolved: No active redirect (e.g., initial load or not a redirect URI).");
+            }
+        }).catch((error) => {
+            console.error("MSAL handleRedirectPromise FAILED:", error); // Critical to see if an error happens here
+        });
 
         return () => {
             if (callbackId) {
+                console.log("AuthProviderWithMsal cleanup: Removing event callback.");
                 msalInstance.removeEventCallback(callbackId);
             }
         };
-    }, []);
+    }, []); // Empty dependency array, runs once on mount
 
     return (
         <MsalProvider instance={msalInstance}>
