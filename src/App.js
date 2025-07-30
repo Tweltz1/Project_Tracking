@@ -8,10 +8,10 @@ const AuthContext = createContext(null);
 // --- MSAL Configuration ---
 const msalConfig = {
     auth: {
-        clientId: '5aa716c1-5e3e-4227-b897-061de2e2b482', // Your Application (client) ID
-        authority: 'https://compprojecttracking.b2clogin.com/compprojecttracking.onmicrosoft.com/B2C_1_signup_signin', // Your B2C Tenant Name and User Flow Name
-        redirectUri: 'https://polite-ocean-05506b310.1.azurestaticapps.net/', // Your Azure Static Web App URL
-        knownAuthorities: ['compprojecttracking.b2clogin.com'] // Just the tenant login domain
+        clientId: '5aa716c1-5e3e-4227-b897-061de2e2b482',
+        authority: 'https://compprojecttracking.b2clogin.com/compprojecttracking.onmicrosoft.com/B2C_1_signup_signin',
+        redirectUri: 'https://polite-ocean-05506b310.1.azurestaticapps.net/',
+        knownAuthorities: ['compprojecttracking.b2clogin.com']
     },
     cache: {
         cacheLocation: "sessionStorage",
@@ -23,39 +23,58 @@ const msalInstance = new PublicClientApplication(msalConfig);
 
 // --- AuthProvider (MSAL Wrapper) ---
 const AuthProviderWithMsal = ({ children }) => {
+    const [isMsalInitialized, setIsMsalInitialized] = useState(false);
+
     useEffect(() => {
-        console.log("AuthProviderWithMsal: Setting up MSAL event callbacks.");
+        const initializeMsal = async () => {
+            try {
+                console.log("Initializing MSAL instance...");
+                await msalInstance.initialize(); // Call initialize and await it
+                setIsMsalInitialized(true); // Set state to indicate initialization is complete
+                console.log("MSAL instance initialized.");
 
-        const handleMsalEvent = (event) => { // Generic event handler
-            console.log("MSAL Event Fired:", event.eventType, event.payload);
-            if (event.eventType === EventType.LOGIN_SUCCESS && event.payload.account) {
-                console.log("SUCCESS: MSAL LOGIN_SUCCESS event detected with account:", event.payload.account.username);
-            } else if (event.eventType === EventType.LOGOUT_SUCCESS) {
-                console.log("SUCCESS: MSAL LOGOUT_SUCCESS event detected.");
+                // Now that MSAL is initialized, set up event callbacks
+                const handleMsalEvent = (event) => {
+                    console.log("MSAL Event Fired:", event.eventType, event.payload);
+                    if (event.eventType === EventType.LOGIN_SUCCESS && event.payload.account) {
+                        console.log("SUCCESS: MSAL LOGIN_SUCCESS event detected with account:", event.payload.account.username);
+                    } else if (event.eventType === EventType.LOGOUT_SUCCESS) {
+                        console.log("SUCCESS: MSAL LOGOUT_SUCCESS event detected.");
+                    }
+                };
+
+                // Add event callback AFTER initialization
+                const callbackId = msalInstance.addEventCallback(handleMsalEvent);
+
+                // No longer manually call handleRedirectPromise here.
+                // MsalProvider (further down) will call it automatically after initialization.
+
+                return () => {
+                    if (callbackId) {
+                        console.log("AuthProviderWithMsal cleanup: Removing event callback.");
+                        msalInstance.removeEventCallback(callbackId);
+                    }
+                };
+
+            } catch (error) {
+                console.error("MSAL initialization failed:", error);
             }
         };
 
-        const callbackId = msalInstance.addEventCallback(handleMsalEvent);
+        // Only run initialization once on mount
+        initializeMsal();
 
-        // Explicitly handle redirect promise. MsalProvider usually does this, but good for debugging.
-        msalInstance.handleRedirectPromise().then((response) => {
-            if (response) {
-                console.log("MSAL handleRedirectPromise resolved with response:", response);
-                // At this point, accounts and isAuthenticated should update
-            } else {
-                console.log("MSAL handleRedirectPromise resolved: No active redirect (e.g., initial load or not a redirect URI).");
-            }
-        }).catch((error) => {
-            console.error("MSAL handleRedirectPromise FAILED:", error); // Critical to see if an error happens here
-        });
-
-        return () => {
-            if (callbackId) {
-                console.log("AuthProviderWithMsal cleanup: Removing event callback.");
-                msalInstance.removeEventCallback(callbackId);
-            }
-        };
     }, []); // Empty dependency array, runs once on mount
+
+    if (!isMsalInitialized) {
+        // You might want a simple loading indicator here, or it will be handled by AuthContentWrapper's loadingAuth
+        console.log("AuthProviderWithMsal: MSAL not yet initialized. Waiting...");
+        return (
+             <div className="flex items-center justify-center min-h-screen bg-gray-100">
+                 <div className="text-xl font-semibold text-gray-700">Initializing authentication library...</div>
+             </div>
+         );
+    }
 
     return (
         <MsalProvider instance={msalInstance}>
