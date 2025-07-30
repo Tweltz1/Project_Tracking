@@ -5,8 +5,7 @@
   "main": "src/functions/*.js",
   "scripts": {
     "start": "func start",
-    "test": "echo \"No tests yet...\"",
-	"build": "tsc"
+    "test": "echo \"No tests yet...\""
   },
   "dependencies": {
     "@azure/cosmos": "^4.5.0",
